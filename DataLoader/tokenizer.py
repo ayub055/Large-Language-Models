@@ -1,4 +1,8 @@
 import re
+import torch
+import tiktoken
+import torch.nn as nn
+from torch.utils.data import Dataset, DataLoader
 
 def vocabulary(data = 'the-verdict.txt'):
     with open(data, "r", encoding = "utf-8") as f:
@@ -11,6 +15,12 @@ def vocabulary(data = 'the-verdict.txt'):
     vocab = {word:id for id, word in enumerate(unique_words)}
     # print(len(unique_words), len(preprocessed_text), len(vocab))
     return vocab
+
+def create_dataloader(txt, batch_size, context_size, stride):
+    tokenizer = tiktoken.get_encoding("gpt2")
+    dataset = GPTDataset(txt, tokenizer, context_size, stride)
+    dataloader = DataLoader(dataset, batch_size, num_workers=0, shuffle=False)
+    return dataloader
     
 class SimpleTokenizer:
     def __init__(self, vocab):
@@ -29,16 +39,55 @@ class SimpleTokenizer:
         text = re.sub(r'\s+([,.?!"()\'])', r'\1', text)
         return text
     
+class GPTDataset(Dataset):
+    def __init__(self, txt, tokenizer, context, stride):
+        self.input_idxs = []
+        self.target_idxs = []
+        
+        # Tokenize the entire dataset
+        token_ids = tokenizer.encode(txt, allowed_special={"<|endoftext|>"})
+        num_token = len(token_ids)
+        for i in range(0, num_token - context, stride):
+            input_chunk = token_ids[i:i+context]
+            output_chunk = token_ids[i+1:i+context+1]
+            
+            self.input_idxs.append(torch.tensor(input_chunk))
+            self.target_idxs.append(torch.tensor(output_chunk))
+    
+    def __len__(self):
+        return len(self.input_idxs)
+    
+    def __getitem__(self, idx):
+        return self.input_idxs[idx], self.target_idxs[idx]
+        
+
+def token_emebedding(dataloader, vocab_size, context_size, output_dim):
+    token_embd_layer = nn.Embedding(vocab_size, output_dim)
+    pos_embd_layer = nn.Embedding(context_size, output_dim)
+    
+    for batch in dataloader:
+        X, y = batch
+        token_emb = token_embd_layer(X)
+        pos_emb = pos_embd_layer(torch.arange(context_size))
+        
+        inp_emb = token_emb + pos_emb
+        return inp_emb
+        
+    
+    
 if __name__ == "__main__": 
+    with open("the-verdict.txt", "r", encoding="utf-8") as f:
+        raw_text = f.read()
+    vocab_size = 50257
+    output_dim = 256
+    context_size = 1024
     
-    vocab = vocabulary()
-    tokenizer = SimpleTokenizer(vocab=vocab)
+    dataloader = create_dataloader(raw_text, batch_size=8, context_size=4, stride=1)
+    embeddings = token_emebedding(dataloader=dataloader, vocab_size=vocab_size,
+                                  context_size=4, output_dim=output_dim)
+    print(embeddings.shape)
     
-    text = "Hello, world. This, is a test."
-    enc = tokenizer.encode(text)
-    dec = tokenizer.decode(enc)
-    print(enc)
-    print(dec)
+    
     
     
     
