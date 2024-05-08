@@ -75,6 +75,7 @@ def token_emebedding(dataloader, vocab_size, context_size, output_dim):
         
     
     
+    
 if __name__ == "__main__": 
     with open("the-verdict.txt", "r", encoding="utf-8") as f:
         raw_text = f.read()
