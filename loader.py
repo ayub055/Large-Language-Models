@@ -29,3 +29,14 @@ def create_loader(txt, batch_size, max_length, stride, shuffle, drop_last, num_w
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last, num_workers=num_workers)
     return dataloader
 
+def generate_text(model, idx, max_new_tokens, context_size):
+    for _ in range(max_new_tokens):
+        idx_cond = idx[:, -context_size:]
+        with torch.no_grad:
+            logits = model(idx_cond)
+        logits = logits[:, -1, :]
+        idx_next = torch.argmax(logits, dim=-1, keepdim=True)
+        idx = torch.cat((idx, idx_next), dim=1)
+    
+    return idx
+
