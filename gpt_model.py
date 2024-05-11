@@ -31,13 +31,14 @@ class GELU(nn.Module):
 
     def forward(self, x):
         t = x + 0.044715 * torch.pow(x, 3)
-        t = torch.tanh(torch.sqrt(2.0/torch.pi) * t)
+        t = torch.tanh(torch.sqrt(torch.tensor(2.0/torch.pi)) * t)
         return 0.5 * x * t
     
 class MultiHeadAttention(nn.Module):
     def __init__(self, d_in, d_out, num_heads, dropout, context_length, qkv_bias=False) -> None:
         super().__init__()
         self.d_out = d_out
+        self.num_heads = num_heads
         self.head_dim = d_out//num_heads
         self.dropout = dropout
         self.W_key = nn.Linear(d_in, d_out, bias=qkv_bias)
@@ -83,8 +84,12 @@ class TransformerBlock(nn.Module):
     def __init__(self, cfg) -> None:
         super().__init__()
         self.attention = MultiHeadAttention(
-
-        )
+            d_in=cfg["emb_dim"],
+            d_out=cfg["emb_dim"],
+            context_length=cfg["context_length"],
+            num_heads=cfg["n_heads"],
+            dropout=cfg["drop_rate"],
+            qkv_bias=cfg["qkv_bias"])
         self.ffn = FeedForwardNetwork(cfg)
         self.ln1 = LayerNorm(cfg['emb_dim'])
         self.ln2 = LayerNorm(cfg['emb_dim'])
